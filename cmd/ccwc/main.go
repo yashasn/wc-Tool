@@ -4,16 +4,58 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
+	"unicode"
 )
+
+type stats struct {
+	lineCount int64
+	wordCount int64
+	byteCount int64
+	charCount int64
+}
+
+func GetStats(file *os.File) stats {
+	reader := bufio.NewReader(file)
+	stats := stats{}
+	endOfWord := false
+	for {
+		char, size, err := reader.ReadRune()
+		if err != nil {
+			if err == io.EOF {
+				if endOfWord {
+					stats.wordCount++
+				}
+				break
+			}
+			log.Fatal(err)
+		}
+		stats.byteCount += int64(size)
+		stats.charCount++
+		if unicode.IsSpace(char) {
+			if endOfWord {
+				stats.wordCount++
+				endOfWord = false
+			}
+		} else {
+			endOfWord = true
+		}
+		if char == '\n' {
+			stats.lineCount++
+		}
+	}
+	return stats
+}
 
 func main() {
 
 	lineCountFlag := flag.Bool("l", false, "Count lines")
 	wordCountFlag := flag.Bool("w", false, "Count words")
 	byteCountFlag := flag.Bool("c", false, "Count bytes")
+	charCountFlag := flag.Bool("m", false, "Count characters")
 	flag.Parse()
 
 	filePath := flag.CommandLine.Arg(0)
@@ -40,54 +82,35 @@ func main() {
 	}
 	// #endregion
 
+	stats := GetStats(file)
+
 	if *lineCountFlag {
-		fmt.Print(getLineCount(file))
+		fmt.Print(stats.lineCount)
 	} else if *wordCountFlag {
-		fmt.Print(getWordCount(file))
+		fmt.Print(stats.wordCount)
 	} else if *byteCountFlag {
-		fmt.Print(getByteCount(file))
+		fmt.Print(stats.byteCount)
+	} else if *charCountFlag {
+		fmt.Print(stats.charCount)
 	} else {
-		fmt.Printf("%d  %d  %d", getLineCount(file), getWordCount(file), getByteCount(file))
+		fmt.Printf("%d  %d  %d", stats.lineCount, stats.wordCount, stats.byteCount)
 	}
-	fmt.Print(" ", filePath)
+	fmt.Printf(" %s \n", filePath)
 
 }
 
-func getLineCount(file *os.File) int {
+func GetStatsAlternate(file *os.File) stats {
 	scanner := bufio.NewScanner(file)
-	lineCount := 0
-	for scanner.Scan() {
-		lineCount++
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-		return -1
-	}
-	return lineCount
-}
-func getWordCount(file *os.File) int {
-	scanner := bufio.NewScanner(file)
-	wordCount := 0
+	stats := stats{}
 	for scanner.Scan() {
 		line := scanner.Text()
-		wordCount += len(strings.Fields(line))
+		stats.lineCount++
+		stats.wordCount += int64(len(strings.Fields(line)))
+		stats.byteCount += int64(len(line))
+		stats.charCount += int64(len([]rune(line)))
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
-		return -1
 	}
-	return wordCount
-}
-func getByteCount(file *os.File) int {
-	scanner := bufio.NewScanner(file)
-	byteCount := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		byteCount += len(line)
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-		return -1
-	}
-	return byteCount
+	return stats
 }
