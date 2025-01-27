@@ -1,4 +1,4 @@
-# wc-Tool
+# wc-tool
 Replicating Unix command line tool wc
 
 

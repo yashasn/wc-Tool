@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
@@ -15,20 +16,29 @@ func main() {
 	byteCountFlag := flag.Bool("c", false, "Count bytes")
 	flag.Parse()
 
-	args := flag.Args()
-	if len(args) < 1 {
-		fmt.Println("Usage: go run main.go <file>")
-		return
-	}
-	filePath := args[0]
+	filePath := flag.CommandLine.Arg(0)
 
-	// Open file for reading
-	file, err := os.Open(filePath)
+	// #region Pipe/File handling
+	stat, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		log.Fatal(err)
 	}
-	defer file.Close()
+
+	var file *os.File
+
+	//The bitwise AND operation between stat.Mode() and os.ModeCharDevice checks if the ModeCharDevice bit is set in the FileMode.
+	//If the result is non-zero, it means the ModeCharDevice bit is set, indicating that the file is a character device (terminal).
+	//If the result is zero, it means the ModeCharDevice bit is not set, indicating that the file is not a character device (not a terminal).
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		file = os.Stdin
+	} else {
+		file, err = os.Open(filePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+	}
+	// #endregion
 
 	if *lineCountFlag {
 		fmt.Print(getLineCount(file))
@@ -50,7 +60,7 @@ func getLineCount(file *os.File) int {
 		lineCount++
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
+		log.Fatal(err)
 		return -1
 	}
 	return lineCount
@@ -63,7 +73,7 @@ func getWordCount(file *os.File) int {
 		wordCount += len(strings.Fields(line))
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
+		log.Fatal(err)
 		return -1
 	}
 	return wordCount
@@ -76,7 +86,7 @@ func getByteCount(file *os.File) int {
 		byteCount += len(line)
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
+		log.Fatal(err)
 		return -1
 	}
 	return byteCount
